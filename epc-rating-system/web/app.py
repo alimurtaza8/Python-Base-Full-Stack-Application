@@ -4,6 +4,8 @@ import os
 import json
 import numpy as np
 from pathlib import Path
+import threading
+import time
 
 # Add parent directory to path to import models
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,18 +24,20 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 nn_models = NeuralNetworkModels(model_dir=MODELS_DIR)
 rag_model = RAGAI(model_dir=MODELS_DIR)
 
-# Global flag to track if models are loaded
+# Global flags
 models_loaded = False
 models_trained = False
+is_training = False
+training_error = None
 
-def train_and_save_models():
-    """Train and save models if they don't exist."""
-    global models_trained
+def train_models_in_background():
+    """Train models in a background thread."""
+    global models_loaded, models_trained, is_training, training_error
     
-    if models_trained:
-        return True
-        
     try:
+        is_training = True
+        training_error = None
+        
         from train_models import generate_sample_data
         
         print("Training new models...")
@@ -61,61 +65,52 @@ def train_and_save_models():
         rag_model.train(X_train, y_train, feature_names=feature_names, class_mapping=class_mapping)
         
         models_trained = True
+        models_loaded = True
         print("Models trained and saved successfully!")
-        return True
-    except Exception as e:
-        print(f"Error training models: {e}")
-        return False
-
-def load_or_train_models():
-    """Load models if they exist, otherwise train new ones."""
-    global models_loaded
-    
-    try:
-        print(f"Loading or training models...")
         
-        # Always train models in production environment
-        if os.getenv('RAILWAY_ENVIRONMENT') == 'production':
-            if train_and_save_models():
-                models_loaded = True
-                return True
-            return False
-            
-        # For development, try loading first
-        try:
-            nn_models.load_models()
-            rag_model.load_model()
-            models_loaded = True
-            print("Models loaded successfully!")
-            return True
-        except:
-            print("Models not found. Training new ones...")
-            if train_and_save_models():
-                models_loaded = True
-                return True
-            return False
-            
     except Exception as e:
-        print(f"Error in load_or_train_models: {e}")
-        return False
+        training_error = str(e)
+        print(f"Error training models: {e}")
+    finally:
+        is_training = False
 
 @app.route('/')
 def home():
     """Render the home page."""
     return render_template('index.html')
 
+@app.route('/status')
+def status():
+    """Get the current status of model training/loading."""
+    return jsonify({
+        'models_loaded': models_loaded,
+        'is_training': is_training,
+        'training_error': training_error
+    })
+
 @app.route('/predict', methods=['POST'])
 def predict():
     """Make predictions using all models."""
-    global models_loaded
+    global models_loaded, is_training
     
     try:
-        # Load or train models if not already loaded
+        # Check if models are still training
+        if is_training:
+            return jsonify({
+                'error': 'Models are still being trained. Please try again in a moment.'
+            }), 503
+        
+        # Check if models failed to train
+        if training_error:
+            return jsonify({
+                'error': f'Model training failed: {training_error}'
+            }), 500
+        
+        # Check if models are loaded
         if not models_loaded:
-            if not load_or_train_models():
-                return jsonify({
-                    'error': 'Could not load or train models. Please try again later.'
-                }), 500
+            return jsonify({
+                'error': 'Models are not ready. Please wait for training to complete.'
+            }), 503
         
         # Get input data
         data = request.json
@@ -185,12 +180,15 @@ def get_sample_data():
     ]
     return jsonify(sample_data)
 
-# Train models on startup in production
+# Start model training in background thread on startup
 if os.getenv('RAILWAY_ENVIRONMENT') == 'production':
-    print("Production environment detected. Training models on startup...")
-    load_or_train_models()
+    print("Production environment detected. Starting model training in background...")
+    training_thread = threading.Thread(target=train_models_in_background)
+    training_thread.start()
 
 if __name__ == '__main__':
-    # Try to load models on startup
-    load_or_train_models()
+    # Start training in background for development
+    if not models_loaded:
+        training_thread = threading.Thread(target=train_models_in_background)
+        training_thread.start()
     app.run(debug=True)
