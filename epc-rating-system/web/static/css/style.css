@@ -1,0 +1,118 @@
+/* Custom styles for EPC Rating System */
+
+/* Rating badges */
+.rating-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-weight: bold;
+    text-align: center;
+    min-width: 80px;
+}
+
+.rating-A {
+    background-color: #22c55e;
+    color: white;
+}
+
+.rating-B {
+    background-color: #84cc16;
+    color: white;
+}
+
+.rating-C {
+    background-color: #eab308;
+    color: white;
+}
+
+.rating-D {
+    background-color: #f97316;
+    color: white;
+}
+
+.rating-E {
+    background-color: #ef4444;
+    color: white;
+}
+
+/* Input focus states */
+.feature-input input:focus {
+    outline: none;
+    ring: 2px;
+    ring-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+/* Custom scrollbar */
+.explanation-box {
+    max-height: 300px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.explanation-box::-webkit-scrollbar {
+    width: 8px;
+}
+
+.explanation-box::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.explanation-box::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 4px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    .grid {
+        gap: 1rem;
+    }
+    
+    .text-4xl {
+        font-size: 1.875rem;
+    }
+}
+
+/* Card hover effects */
+.hover-card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-spinner {
+    animation: spin 1s linear infinite;
+} 
