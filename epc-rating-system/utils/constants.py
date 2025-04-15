@@ -112,7 +112,8 @@ SAMPLE_BUILDINGS = [
         'energy_consumption': 320.0
     }
 ]
-
+# Feature descriptions for UI
+# FEATURE_DESCRIPTIONS = {
 # Feature descriptions for UI
 # FEATURE_DESCRIPTIONS = {
 #     'building_age': 'Age of the building in years',

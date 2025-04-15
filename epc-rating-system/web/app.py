@@ -24,60 +24,79 @@ rag_model = RAGAI(model_dir=MODELS_DIR)
 
 # Global flag to track if models are loaded
 models_loaded = False
+models_trained = False
 
 def train_and_save_models():
     """Train and save models if they don't exist."""
-    from train_models import generate_sample_data
+    global models_trained
     
-    print("Training new models...")
-    X, y = generate_sample_data()
-    
-    # Split data
-    from sklearn.model_selection import train_test_split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-    
-    # Train Neural Network Models
-    nn_models.build_all_models(input_dim=X.shape[1], num_classes=5)
-    nn_models.train(X_train, y_train, X_test, y_test)
-    
-    # Train RAG Model
-    feature_names = [
-        'building_age',
-        'insulation_quality',
-        'heating_efficiency',
-        'window_quality',
-        'renewable_energy'
-    ]
-    class_mapping = {0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'E'}
-    rag_model.train(X_train, y_train, feature_names=feature_names, class_mapping=class_mapping)
-    
-    print("Models trained and saved successfully!")
-
-def load_models():
-    """Load all models and return True if successful."""
-    global models_loaded
+    if models_trained:
+        return True
+        
     try:
-        print(f"Loading models from: {MODELS_DIR}")
+        from train_models import generate_sample_data
         
-        # Check if models exist
-        shallow_nn_path = os.path.join(MODELS_DIR, 'nn_shallow.h5')
-        deep_nn_path = os.path.join(MODELS_DIR, 'nn_deep.h5')
-        rag_path = os.path.join(MODELS_DIR, 'rag_model.joblib')
+        print("Training new models...")
+        X, y = generate_sample_data()
         
-        if not all(os.path.exists(p) for p in [shallow_nn_path, deep_nn_path, rag_path]):
-            print("Models not found. Training new models...")
-            train_and_save_models()
+        # Split data
+        from sklearn.model_selection import train_test_split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
         
-        # Load the models
-        nn_models.load_models()
-        rag_model.load_model()
-        models_loaded = True
-        print("All models loaded successfully!")
+        # Train Neural Network Models
+        nn_models.build_all_models(input_dim=X.shape[1], num_classes=5)
+        nn_models.train(X_train, y_train, X_test, y_test)
+        
+        # Train RAG Model
+        feature_names = [
+            'building_age',
+            'insulation_quality',
+            'heating_efficiency',
+            'window_quality',
+            'renewable_energy'
+        ]
+        class_mapping = {0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'E'}
+        rag_model.train(X_train, y_train, feature_names=feature_names, class_mapping=class_mapping)
+        
+        models_trained = True
+        print("Models trained and saved successfully!")
         return True
     except Exception as e:
-        print(f"Error loading models: {e}")
+        print(f"Error training models: {e}")
+        return False
+
+def load_or_train_models():
+    """Load models if they exist, otherwise train new ones."""
+    global models_loaded
+    
+    try:
+        print(f"Loading or training models...")
+        
+        # Always train models in production environment
+        if os.getenv('RAILWAY_ENVIRONMENT') == 'production':
+            if train_and_save_models():
+                models_loaded = True
+                return True
+            return False
+            
+        # For development, try loading first
+        try:
+            nn_models.load_models()
+            rag_model.load_model()
+            models_loaded = True
+            print("Models loaded successfully!")
+            return True
+        except:
+            print("Models not found. Training new ones...")
+            if train_and_save_models():
+                models_loaded = True
+                return True
+            return False
+            
+    except Exception as e:
+        print(f"Error in load_or_train_models: {e}")
         return False
 
 @app.route('/')
@@ -91,11 +110,11 @@ def predict():
     global models_loaded
     
     try:
-        # Load models if not already loaded
+        # Load or train models if not already loaded
         if not models_loaded:
-            if not load_models():
+            if not load_or_train_models():
                 return jsonify({
-                    'error': 'Models not loaded. Please ensure models are trained and saved correctly.'
+                    'error': 'Could not load or train models. Please try again later.'
                 }), 500
         
         # Get input data
@@ -166,7 +185,12 @@ def get_sample_data():
     ]
     return jsonify(sample_data)
 
+# Train models on startup in production
+if os.getenv('RAILWAY_ENVIRONMENT') == 'production':
+    print("Production environment detected. Training models on startup...")
+    load_or_train_models()
+
 if __name__ == '__main__':
     # Try to load models on startup
-    load_models()
+    load_or_train_models()
     app.run(debug=True)
